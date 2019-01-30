@@ -388,16 +388,20 @@ drm_backend_la_LIBADD =				\
 	$(DRM_COMPOSITOR_LIBS)			\
 	$(INPUT_BACKEND_LIBS)			\
 	libshared.la				\
-	$(CLOCK_GETTIME_LIBS)
+	$(CLOCK_GETTIME_LIBS)			\
+	$(LIBVA_LIBS)
 drm_backend_la_CFLAGS =				\
 	$(COMPOSITOR_CFLAGS)			\
 	$(EGL_CFLAGS)				\
 	$(DRM_COMPOSITOR_CFLAGS)		\
 	$(INPUT_BACKEND_CFLAGS)			\
+	$(LIBVA_CFLAGS)				\
 	$(AM_CFLAGS)
 drm_backend_la_SOURCES =			\
 	libweston/compositor-drm.c		\
 	libweston/compositor-drm.h		\
+	libweston/va_renderer.c			\
+	libweston/va_renderer.h			\
 	$(INPUT_BACKEND_SOURCES)		\
 	shared/helpers.h			\
 	shared/timespec-util.h			\
