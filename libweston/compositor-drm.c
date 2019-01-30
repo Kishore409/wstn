@@ -66,6 +66,7 @@
 #include "presentation-time-server-protocol.h"
 #include "linux-dmabuf.h"
 #include "linux-dmabuf-unstable-v1-server-protocol.h"
+#include "va_renderer.h"
 
 #ifndef DRM_CLIENT_CAP_ASPECT_RATIO
 #define DRM_CLIENT_CAP_ASPECT_RATIO	4
@@ -350,6 +351,7 @@ struct drm_backend {
 	bool fb_modifiers;
 
 	struct weston_debug_scope *debug;
+	struct va_renderer *va_renderer;
 };
 
 struct drm_mode {
@@ -2115,6 +2117,8 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	struct drm_plane *scanout_plane = output->scanout_plane;
 	struct drm_backend *b = to_drm_backend(c);
 	struct drm_fb *fb;
+	struct weston_view *ev;
+	int ret;
 
 	/* If we already have a client buffer promoted to scanout, then we don't
 	 * want to render. */
@@ -2122,6 +2126,17 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 						   output->scanout_plane);
 	if (scanout_state->fb)
 		return;
+
+	wl_list_for_each(ev, &c->view_list, link) {
+		struct weston_surface *surface = ev->surface;
+		weston_log("hkps %s:%d (%d, %d) hdr metadata %p\n", __PRETTY_FUNCTION__, __LINE__, surface->width, surface->height, surface->hdr_metadata);
+		if (surface->hdr_metadata) {
+			ret = va_renderer_tonemap(b->va_renderer, ev);
+			if (!ret)
+				weston_log("Unable to tonemap via libva\n");
+		}
+
+	}
 
 	if (!pixman_region32_not_empty(damage) &&
 	    scanout_plane->state_cur->fb &&
@@ -6612,6 +6627,7 @@ drm_destroy(struct weston_compositor *ec)
 
 	udev_input_destroy(&b->input);
 
+	va_renderer_fini(b->va_renderer);
 	wl_event_source_remove(b->udev_drm_source);
 	wl_event_source_remove(b->drm_source);
 
@@ -7469,6 +7485,10 @@ drm_backend_create(struct weston_compositor *compositor,
 	if (weston_colorspace_setup(compositor) < 0)
 		weston_log("Error: initializing colorspace "
 			   "support failed.\n");
+
+	b->va_renderer = va_renderer_initialize(b->drm.fd, b->gbm);
+	if (!b->va_renderer)
+		weston_log("Unable to initialize va renderer\n");
 
 	ret = weston_plugin_api_register(compositor, WESTON_DRM_OUTPUT_API_NAME,
 					 &api, sizeof(api));
